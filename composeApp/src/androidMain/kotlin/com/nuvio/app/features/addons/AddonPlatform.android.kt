@@ -315,7 +315,7 @@ actual suspend fun httpGetTextLines(
     url: String,
     headers: Map<String, String>,
     onContentType: (contentType: String?) -> Unit,
-    onLine: (line: String) -> Unit,
+    onLine: suspend (line: String) -> Unit,
 ): Unit = withContext(Dispatchers.IO) {
     val builder = Request.Builder().url(url)
     headers.withoutAcceptEncoding().forEach { (key, value) ->

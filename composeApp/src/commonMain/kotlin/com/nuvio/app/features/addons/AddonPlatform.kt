@@ -46,5 +46,5 @@ expect suspend fun httpGetTextLines(
     url: String,
     headers: Map<String, String>,
     onContentType: (contentType: String?) -> Unit,
-    onLine: (line: String) -> Unit,
+    onLine: suspend (line: String) -> Unit,
 )

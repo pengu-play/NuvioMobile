@@ -188,6 +188,8 @@ internal suspend fun fetchAddonStreamsIncrementally(
         headers = headers,
         onContentType = { contentType -> isNdjson = isNdjsonContentType(contentType) },
         onLine = { line ->
+            if (rawChunks.isNotEmpty()) rawChunks.append('\n')
+            rawChunks.append(line)
             if (isNdjson && line.isNotBlank()) {
                 val batch = StreamParser.parseNdjsonBatch(line, addonName, addonId, addonLogo)
                 if (batch.isNotEmpty()) {
@@ -202,9 +204,6 @@ internal suspend fun fetchAddonStreamsIncrementally(
                         )
                     )
                 }
-            } else {
-                if (rawChunks.isNotEmpty()) rawChunks.append('\n')
-                rawChunks.append(line)
             }
         },
     )
