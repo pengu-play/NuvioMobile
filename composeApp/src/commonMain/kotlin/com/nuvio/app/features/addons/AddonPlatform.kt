@@ -41,3 +41,10 @@ expect suspend fun httpRequestRaw(
     followRedirects: Boolean = true,
     maxResponseBodyBytes: Int = DefaultRawHttpResponseMaxBytes,
 ): RawHttpResponse
+
+expect suspend fun httpGetTextLines(
+    url: String,
+    headers: Map<String, String>,
+    onContentType: (contentType: String?) -> Unit,
+    onLine: (line: String) -> Unit,
+)

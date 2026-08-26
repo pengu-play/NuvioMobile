@@ -5,8 +5,10 @@ import android.content.SharedPreferences
 import com.nuvio.app.core.diagnostics.SentryNetworkBreadcrumbInterceptor
 import com.nuvio.app.core.network.IPv4FirstDns
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.network_empty_response_body
 import nuvio.composeapp.generated.resources.network_request_failed_http
@@ -308,3 +310,31 @@ actual suspend fun httpRequestRaw(
             )
         }
     }
+
+actual suspend fun httpGetTextLines(
+    url: String,
+    headers: Map<String, String>,
+    onContentType: (contentType: String?) -> Unit,
+    onLine: (line: String) -> Unit,
+): Unit = withContext(Dispatchers.IO) {
+    val builder = Request.Builder().url(url)
+    headers.withoutAcceptEncoding().forEach { (key, value) ->
+        builder.header(key, value)
+    }
+    builder.header("Accept", headers.getHeaderIgnoreCase("Accept") ?: "application/json")
+
+    AddonHttpClientProvider.get().newCall(builder.build()).execute().use { response ->
+        onContentType(response.header("Content-Type"))
+        if (!response.isSuccessful) {
+            error(runBlocking { getString(Res.string.network_request_failed_http, response.code) })
+        }
+        val source = response.body?.source()
+            ?: error(runBlocking { getString(Res.string.network_empty_response_body) })
+        val context = coroutineContext
+        while (true) {
+            context.ensureActive()
+            val line = source.readUtf8Line() ?: break
+            onLine(line)
+        }
+    }
+}

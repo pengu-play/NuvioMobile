@@ -7,14 +7,17 @@ import io.ktor.client.request.accept
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.request.url
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.readUTF8Line
 import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.network_empty_response_body
@@ -191,3 +194,27 @@ actual suspend fun httpRequestRaw(
                 },
             )
         }
+
+actual suspend fun httpGetTextLines(
+    url: String,
+    headers: Map<String, String>,
+    onContentType: (contentType: String?) -> Unit,
+    onLine: (line: String) -> Unit,
+) {
+    addonHttpClient.prepareGet(url) {
+        accept(ContentType.Application.Json)
+        headers.forEach { (key, value) ->
+            header(key, value)
+        }
+    }.execute { response ->
+        onContentType(response.headers[HttpHeaders.ContentType])
+        if (!response.status.isSuccess()) {
+            error(runBlocking { getString(Res.string.network_request_failed_http, response.status.value) })
+        }
+        val channel = response.bodyAsChannel()
+        while (!channel.isClosedForRead) {
+            val line = channel.readUTF8Line(limit = Int.MAX_VALUE) ?: break
+            onLine(line)
+        }
+    }
+}
