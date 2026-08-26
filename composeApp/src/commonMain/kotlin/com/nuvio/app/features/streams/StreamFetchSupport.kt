@@ -209,30 +209,44 @@ internal suspend fun fetchAddonStreamsIncrementally(
     )
 
     val rawPayload = rawChunks.toString()
-    return if (sawNdjsonBatch) {
-        AddonStreamGroup(
+    return when {
+        sawNdjsonBatch -> AddonStreamGroup(
             addonName = addonName,
             addonId = addonId,
             streams = streamsByKey.values.toList(),
             isLoading = false,
         )
-    } else {
-        if (rawPayload.isBlank()) {
-            throw IllegalStateException(getString(Res.string.network_empty_response_body))
+
+        !isNdjson -> {
+            if (rawPayload.isBlank()) {
+                throw IllegalStateException(getString(Res.string.network_empty_response_body))
+            }
+            AddonStreamGroup(
+                addonName = addonName,
+                addonId = addonId,
+                streams = StreamParser.parse(rawPayload, addonName, addonId, addonLogo),
+                isLoading = false,
+            )
         }
-        if (!isNdjson) {
-            val streams = StreamParser.parse(rawPayload, addonName, addonId, addonLogo)
-            return AddonStreamGroup(addonName, addonId, streams, isLoading = false)
-        }
+
+        rawPayload.isBlank() -> AddonStreamGroup(
+            addonName = addonName,
+            addonId = addonId,
+            streams = emptyList(),
+            isLoading = false,
+        )
+
         // Declared NDJSON but no batch decoded: some addons label a single
         // regular JSON document as NDJSON. Recover it before failing.
-        val recovered = try {
-            StreamParser.parse(rawPayload, addonName, addonId, addonLogo)
-        } catch (error: Throwable) {
-            if (error is CancellationException) throw error
-            emptyList()
+        else -> {
+            val recovered = try {
+                StreamParser.parse(rawPayload, addonName, addonId, addonLogo)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                emptyList()
+            }
+            AddonStreamGroup(addonName, addonId, recovered, isLoading = false)
         }
-        AddonStreamGroup(addonName, addonId, recovered, isLoading = false)
     }
 }
 
