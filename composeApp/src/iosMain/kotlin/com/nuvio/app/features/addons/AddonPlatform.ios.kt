@@ -213,7 +213,7 @@ actual suspend fun httpGetTextLines(
         }
         val channel = response.bodyAsChannel()
         while (!channel.isClosedForRead) {
-            val line = channel.readUTF8Line(limit = Int.MAX_VALUE) ?: break
+            val line = channel.readUTF8Line() ?: break
             onLine(line)
         }
     }
