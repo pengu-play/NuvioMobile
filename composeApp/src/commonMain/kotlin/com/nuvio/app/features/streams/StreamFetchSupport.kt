@@ -2,12 +2,14 @@ package com.nuvio.app.features.streams
 
 import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.ManagedAddon
+import com.nuvio.app.features.addons.httpGetTextLines
 import com.nuvio.app.features.plugins.PluginRepositoryItem
 import com.nuvio.app.features.plugins.PluginRuntimeResult
 import com.nuvio.app.features.plugins.PluginScraper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.network_empty_response_body
 import nuvio.composeapp.generated.resources.streams_plugin_repository_fallback
 import org.jetbrains.compose.resources.getString
 
@@ -154,3 +156,90 @@ private fun String.fallbackRepositoryLabel(): String {
         }
     }
 }
+
+internal const val NdjsonContentType = "application/x-ndjson"
+
+internal fun isNdjsonContentType(contentType: String?): Boolean =
+    contentType
+        ?.substringBefore(';')
+        ?.trim()
+        ?.equals(NdjsonContentType, ignoreCase = true) == true
+
+internal suspend fun fetchAddonStreamsIncrementally(
+    url: String,
+    forceRefresh: Boolean,
+    addonName: String,
+    addonId: String,
+    addonLogo: String?,
+    onIntermediateGroup: suspend (AddonStreamGroup) -> Unit,
+): AddonStreamGroup {
+    val headers = buildMap {
+        put("Accept", "application/json, $NdjsonContentType")
+        if (forceRefresh) put("Cache-Control", "no-cache")
+    }
+
+    var isNdjson = false
+    var sawNdjsonBatch = false
+    val rawChunks = StringBuilder()
+    val streamsByKey = linkedMapOf<String, StreamItem>()
+
+    httpGetTextLines(
+        url = url,
+        headers = headers,
+        onContentType = { contentType -> isNdjson = isNdjsonContentType(contentType) },
+        onLine = { line ->
+            if (isNdjson && line.isNotBlank()) {
+                val batch = StreamParser.parseNdjsonBatch(line, addonName, addonId, addonLogo)
+                if (batch.isNotEmpty()) {
+                    sawNdjsonBatch = true
+                    batch.forEach { stream -> streamsByKey[stream.dedupKey()] = stream }
+                    onIntermediateGroup(
+                        AddonStreamGroup(
+                            addonName = addonName,
+                            addonId = addonId,
+                            streams = streamsByKey.values.toList(),
+                            isLoading = true,
+                        )
+                    )
+                }
+            } else {
+                if (rawChunks.isNotEmpty()) rawChunks.append('\n')
+                rawChunks.append(line)
+            }
+        },
+    )
+
+    val rawPayload = rawChunks.toString()
+    return if (sawNdjsonBatch) {
+        AddonStreamGroup(
+            addonName = addonName,
+            addonId = addonId,
+            streams = streamsByKey.values.toList(),
+            isLoading = false,
+        )
+    } else {
+        if (rawPayload.isBlank()) {
+            throw IllegalStateException(getString(Res.string.network_empty_response_body))
+        }
+        if (!isNdjson) {
+            val streams = StreamParser.parse(rawPayload, addonName, addonId, addonLogo)
+            return AddonStreamGroup(addonName, addonId, streams, isLoading = false)
+        }
+        // Declared NDJSON but no batch decoded: some addons label a single
+        // regular JSON document as NDJSON. Recover it before failing.
+        val recovered = try {
+            StreamParser.parse(rawPayload, addonName, addonId, addonLogo)
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            emptyList()
+        }
+        AddonStreamGroup(addonName, addonId, recovered, isLoading = false)
+    }
+}
+
+private fun StreamItem.dedupKey(): String =
+    infoHash?.let { hash -> "$hash:${fileIdx ?: ""}" }
+        ?: clientResolve?.infoHash?.let { hash -> "$hash:${clientResolve.fileIdx}" }
+        ?: url?.trim()?.takeIf { it.isNotEmpty() }
+        ?: externalUrl?.trim()?.takeIf { it.isNotEmpty() }
+        ?: listOfNotNull(name, title).joinToString(":")

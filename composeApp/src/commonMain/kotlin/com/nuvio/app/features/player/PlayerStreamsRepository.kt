@@ -5,7 +5,6 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.enabledAddons
-import com.nuvio.app.features.addons.fetchAddonResponseText
 import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.debrid.DebridStreamPresentation
 import com.nuvio.app.features.debrid.DirectDebridStreamPreparer
@@ -21,8 +20,8 @@ import com.nuvio.app.features.streams.StreamBadgePresentation
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLoadCompletion
-import com.nuvio.app.features.streams.StreamParser
 import com.nuvio.app.features.streams.StreamsUiState
+import com.nuvio.app.features.streams.fetchAddonStreamsIncrementally
 import com.nuvio.app.features.streams.runCatchingUnlessCancelled
 import com.nuvio.app.features.streams.sortedForGroupedDisplay
 import com.nuvio.app.features.streams.streamAddonInstanceId
@@ -337,23 +336,30 @@ object PlayerStreamsRepository {
 
                     val displayName = addon.addonName
                     val group = runCatchingUnlessCancelled {
-                        val payload = fetchAddonResponseText(
+                        fetchAddonStreamsIncrementally(
                             url = url,
                             forceRefresh = forceRefresh,
-                        )
-                        StreamParser.parse(
-                            payload = payload,
                             addonName = displayName,
                             addonId = addon.addonId,
                             addonLogo = addon.manifest.logoUrl,
+                            onIntermediateGroup = { batchGroup ->
+                                publishStreamGroup(presentStreamGroup(batchGroup))
+                            },
                         )
                     }.fold(
-                        onSuccess = { streams ->
-                            AddonStreamGroup(displayName, addon.addonId, streams, isLoading = false)
+                        onSuccess = { finalGroup ->
+                            log.d { "Got ${finalGroup.streams.size} streams from ${displayName}" }
+                            finalGroup
                         },
                         onFailure = { err ->
                             log.w(err) { "Failed: ${displayName}" }
-                            AddonStreamGroup(displayName, addon.addonId, emptyList(), isLoading = false, error = err.message)
+                            AddonStreamGroup(
+                                addonName = displayName,
+                                addonId = addon.addonId,
+                                streams = emptyList(),
+                                isLoading = false,
+                                error = err.message,
+                            )
                         },
                     )
                     publishCompletion(StreamLoadCompletion.Addon(group))

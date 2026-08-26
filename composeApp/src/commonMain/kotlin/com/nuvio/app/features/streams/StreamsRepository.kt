@@ -5,7 +5,6 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.enabledAddons
-import com.nuvio.app.features.addons.fetchAddonResponseText
 import com.nuvio.app.features.debrid.DirectDebridStreamPreparer
 import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.debrid.DebridStreamPresentation
@@ -440,25 +439,20 @@ object StreamsRepository {
 
                     val displayName = addon.addonName
                     val group = runCatchingUnlessCancelled {
-                        val payload = fetchAddonResponseText(
+                        fetchAddonStreamsIncrementally(
                             url = url,
                             forceRefresh = forceRefresh,
-                        )
-                        StreamParser.parse(
-                            payload = payload,
                             addonName = displayName,
                             addonId = addon.addonId,
                             addonLogo = addon.manifest.logoUrl,
+                            onIntermediateGroup = { batchGroup ->
+                                publishAddonGroup(presentStreamGroup(batchGroup))
+                            },
                         )
                     }.fold(
-                        onSuccess = { streams ->
-                            log.d { "Got ${streams.size} streams from ${displayName}" }
-                            AddonStreamGroup(
-                                addonName = displayName,
-                                addonId = addon.addonId,
-                                streams = streams,
-                                isLoading = false,
-                            )
+                        onSuccess = { finalGroup ->
+                            log.d { "Got ${finalGroup.streams.size} streams from ${displayName}" }
+                            finalGroup
                         },
                         onFailure = { err ->
                             log.w(err) { "Failed to fetch streams from ${displayName}" }

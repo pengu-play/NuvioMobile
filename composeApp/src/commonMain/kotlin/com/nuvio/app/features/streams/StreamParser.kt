@@ -1,7 +1,9 @@
 package com.nuvio.app.features.streams
 
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -23,43 +25,70 @@ object StreamParser {
         val root = json.parseToJsonElement(payload).jsonObject
         val streamsArray = root["streams"] as? JsonArray ?: return emptyList()
         return streamsArray.mapNotNull { element ->
-            val obj = element as? JsonObject ?: return@mapNotNull null
-            val url = obj.string("url")
-            val infoHash = obj.string("infoHash")
-            val externalUrl = obj.string("externalUrl")
-            val clientResolve = obj.objectValue("clientResolve")?.toClientResolve()
-
-            // Must have at least one source or external target.
-            if (url == null && infoHash == null && externalUrl == null && clientResolve == null) return@mapNotNull null
-
-            val hintsObj = obj["behaviorHints"] as? JsonObject
-            val proxyHeaders = hintsObj
-                ?.objectValue("proxyHeaders")
-                ?.toProxyHeaders()
-            StreamItem(
-                name = obj.string("name"),
-                title = obj.string("title"),
-                description = obj.string("description") ?: obj.string("title"),
-                url = url,
-                infoHash = infoHash,
-                fileIdx = obj.int("fileIdx"),
-                externalUrl = externalUrl,
-                sources = obj.stringList("sources"),
-                addonName = addonName,
-                addonId = addonId,
-                addonLogo = addonLogo,
-                streamType = normalizeStreamType(obj.string("type")),
-                clientResolve = clientResolve,
-                behaviorHints = StreamBehaviorHints(
-                    bingeGroup = hintsObj?.string("bingeGroup"),
-                    notWebReady = (hintsObj?.boolean("notWebReady") ?: false) || proxyHeaders != null,
-                    videoHash = hintsObj?.string("videoHash"),
-                    videoSize = hintsObj?.long("videoSize"),
-                    filename = hintsObj?.string("filename"),
-                    proxyHeaders = proxyHeaders,
-                ),
-            )
+            element.toStreamItem(addonName, addonId, addonLogo)
         }
+    }
+
+    fun parseNdjsonBatch(
+        payload: String,
+        addonName: String,
+        addonId: String,
+        addonLogo: String? = null,
+    ): List<StreamItem> {
+        val trimmed = payload.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        return try {
+            val root = json.parseToJsonElement(trimmed).jsonObject
+            val streamsArray = root["streams"] as? JsonArray ?: return emptyList()
+            streamsArray.mapNotNull { element ->
+                element.toStreamItem(addonName, addonId, addonLogo)
+            }
+        } catch (_: SerializationException) {
+            emptyList()
+        }
+    }
+
+    private fun JsonElement.toStreamItem(
+        addonName: String,
+        addonId: String,
+        addonLogo: String?,
+    ): StreamItem? {
+        val obj = this as? JsonObject ?: return null
+        val url = obj.string("url")
+        val infoHash = obj.string("infoHash")
+        val externalUrl = obj.string("externalUrl")
+        val clientResolve = obj.objectValue("clientResolve")?.toClientResolve()
+
+        // Must have at least one source or external target.
+        if (url == null && infoHash == null && externalUrl == null && clientResolve == null) return null
+
+        val hintsObj = obj["behaviorHints"] as? JsonObject
+        val proxyHeaders = hintsObj
+            ?.objectValue("proxyHeaders")
+            ?.toProxyHeaders()
+        return StreamItem(
+            name = obj.string("name"),
+            title = obj.string("title"),
+            description = obj.string("description") ?: obj.string("title"),
+            url = url,
+            infoHash = infoHash,
+            fileIdx = obj.int("fileIdx"),
+            externalUrl = externalUrl,
+            sources = obj.stringList("sources"),
+            addonName = addonName,
+            addonId = addonId,
+            addonLogo = addonLogo,
+            streamType = normalizeStreamType(obj.string("type")),
+            clientResolve = clientResolve,
+            behaviorHints = StreamBehaviorHints(
+                bingeGroup = hintsObj?.string("bingeGroup"),
+                notWebReady = (hintsObj?.boolean("notWebReady") ?: false) || proxyHeaders != null,
+                videoHash = hintsObj?.string("videoHash"),
+                videoSize = hintsObj?.long("videoSize"),
+                filename = hintsObj?.string("filename"),
+                proxyHeaders = proxyHeaders,
+            ),
+        )
     }
 
     private fun JsonObject.string(name: String): String? =
