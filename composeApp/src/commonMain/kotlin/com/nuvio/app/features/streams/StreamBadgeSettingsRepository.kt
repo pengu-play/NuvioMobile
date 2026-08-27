@@ -21,6 +21,7 @@ data class StreamBadgeSettingsUiState(
     val showFileSizeBadges: Boolean = true,
     val showAddonLogo: Boolean = false,
     val badgePlacement: StreamBadgePlacement = StreamBadgePlacement.BOTTOM,
+    val incrementalLoading: Boolean = true,
 )
 
 enum class StreamBadgePlacement {
@@ -43,6 +44,7 @@ object StreamBadgeSettingsRepository {
     private var showFileSizeBadges = true
     private var showAddonLogo = false
     private var badgePlacement = StreamBadgePlacement.BOTTOM
+    private var incrementalLoading = true
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -59,6 +61,7 @@ object StreamBadgeSettingsRepository {
         showFileSizeBadges = true
         showAddonLogo = false
         badgePlacement = StreamBadgePlacement.BOTTOM
+        incrementalLoading = true
         _uiState.value = StreamBadgeSettingsUiState()
     }
 
@@ -75,6 +78,11 @@ object StreamBadgeSettingsRepository {
     fun badgePlacementSnapshot(): StreamBadgePlacement {
         ensureLoaded()
         return _uiState.value.badgePlacement
+    }
+
+    fun incrementalLoadingSnapshot(): Boolean {
+        ensureLoaded()
+        return _uiState.value.incrementalLoading
     }
 
     suspend fun importStreamBadgeRulesFromUrl(url: String): StreamBadgeImportResult {
@@ -156,6 +164,14 @@ object StreamBadgeSettingsRepository {
         StreamBadgeSettingsStorage.saveStreamBadgePlacement(placement.name)
     }
 
+    fun setIncrementalLoading(enabled: Boolean) {
+        ensureLoaded()
+        if (incrementalLoading == enabled) return
+        incrementalLoading = enabled
+        publish()
+        StreamBadgeSettingsStorage.saveIncrementalLoading(enabled)
+    }
+
     private fun loadFromDisk() {
         hasLoaded = true
         val storedRules = parseStreamBadgeRules(StreamBadgeSettingsStorage.loadStreamBadgeRules())
@@ -167,6 +183,7 @@ object StreamBadgeSettingsRepository {
         streamBadgeRules = storedRules ?: legacyRules ?: StreamBadgeRules()
         showFileSizeBadges = StreamBadgeSettingsStorage.loadShowFileSizeBadges() ?: true
         showAddonLogo = StreamBadgeSettingsStorage.loadShowAddonLogo() ?: false
+        incrementalLoading = StreamBadgeSettingsStorage.loadIncrementalLoading() ?: true
         badgePlacement = StreamBadgeSettingsStorage.loadStreamBadgePlacement()
             ?.let { storedPlacement ->
                 StreamBadgePlacement.entries.firstOrNull { placement ->
@@ -187,6 +204,7 @@ object StreamBadgeSettingsRepository {
             showFileSizeBadges = showFileSizeBadges,
             showAddonLogo = showAddonLogo,
             badgePlacement = badgePlacement,
+            incrementalLoading = incrementalLoading,
         )
     }
 

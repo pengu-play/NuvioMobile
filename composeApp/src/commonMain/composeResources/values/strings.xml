@@ -847,6 +847,8 @@
     <string name="settings_stream_size_badges_description">Show file size badges in stream results and player source panels.</string>
     <string name="settings_stream_addon_logo_title">Addon logo</string>
     <string name="settings_stream_addon_logo_description">Show addon logo and name next to stream sources.</string>
+    <string name="settings_stream_incremental_title">Incremental loading</string>
+    <string name="settings_stream_incremental_description">Render addon stream results as they arrive over NDJSON streams. Turn off to wait for the full JSON response.</string>
     <string name="settings_stream_display_section">DISPLAY</string>
     <string name="settings_stream_badge_position_title">Badge position</string>
     <string name="settings_stream_badge_position_description">Choose whether Fusion and size badges appear above or below stream cards.</string>

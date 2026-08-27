@@ -2,6 +2,7 @@ package com.nuvio.app.features.streams
 
 import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.ManagedAddon
+import com.nuvio.app.features.addons.fetchAddonResponseText
 import com.nuvio.app.features.addons.httpGetTextLines
 import com.nuvio.app.features.plugins.PluginRepositoryItem
 import com.nuvio.app.features.plugins.PluginRuntimeResult
@@ -173,6 +174,16 @@ internal suspend fun fetchAddonStreamsIncrementally(
     addonLogo: String?,
     onIntermediateGroup: suspend (AddonStreamGroup) -> Unit,
 ): AddonStreamGroup {
+    if (!StreamBadgeSettingsRepository.incrementalLoadingSnapshot()) {
+        val payload = fetchAddonResponseText(url = url, forceRefresh = forceRefresh)
+        return AddonStreamGroup(
+            addonName = addonName,
+            addonId = addonId,
+            streams = StreamParser.parse(payload, addonName, addonId, addonLogo),
+            isLoading = false,
+        )
+    }
+
     val headers = buildMap {
         put("Accept", "application/json, $NdjsonContentType")
         if (forceRefresh) put("Cache-Control", "no-cache")

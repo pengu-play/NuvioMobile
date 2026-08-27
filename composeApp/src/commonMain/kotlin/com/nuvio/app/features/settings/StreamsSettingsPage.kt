@@ -147,6 +147,13 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                     isTablet = isTablet,
                     onCheckedChange = StreamBadgeSettingsRepository::setShowAddonLogo,
                 )
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_stream_incremental_title),
+                    description = stringResource(Res.string.settings_stream_incremental_description),
+                    checked = currentSettings.incrementalLoading,
+                    isTablet = isTablet,
+                    onCheckedChange = StreamBadgeSettingsRepository::setIncrementalLoading,
+                )
             }
         }
 

@@ -15,8 +15,9 @@ actual object StreamBadgeSettingsStorage {
     private const val showFileSizeBadgesKey = "show_file_size_badges"
     private const val showAddonLogoKey = "show_addon_logo"
     private const val streamBadgePlacementKey = "stream_badge_placement"
+    private const val incrementalLoadingKey = "incremental_loading"
     private const val legacyDebridStreamBadgeRulesKey = "debrid_stream_badge_rules"
-    private val syncKeys = listOf(streamBadgeRulesKey, showFileSizeBadgesKey, streamBadgePlacementKey)
+    private val syncKeys = listOf(streamBadgeRulesKey, showFileSizeBadgesKey, streamBadgePlacementKey, incrementalLoadingKey)
 
     actual fun loadStreamBadgeRules(): String? = loadString(streamBadgeRulesKey)
 
@@ -40,6 +41,12 @@ actual object StreamBadgeSettingsStorage {
 
     actual fun saveStreamBadgePlacement(placement: String) {
         saveString(streamBadgePlacementKey, placement)
+    }
+
+    actual fun loadIncrementalLoading(): Boolean? = loadBoolean(incrementalLoadingKey)
+
+    actual fun saveIncrementalLoading(enabled: Boolean) {
+        saveBoolean(incrementalLoadingKey, enabled)
     }
 
     actual fun loadLegacyDebridStreamBadgeRules(): String? =
@@ -74,6 +81,7 @@ actual object StreamBadgeSettingsStorage {
         loadStreamBadgeRules()?.let { put(streamBadgeRulesKey, encodeSyncString(it)) }
         loadShowFileSizeBadges()?.let { put(showFileSizeBadgesKey, encodeSyncBoolean(it)) }
         loadStreamBadgePlacement()?.let { put(streamBadgePlacementKey, encodeSyncString(it)) }
+        loadIncrementalLoading()?.let { put(incrementalLoadingKey, encodeSyncBoolean(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -84,5 +92,6 @@ actual object StreamBadgeSettingsStorage {
         payload.decodeSyncString(streamBadgeRulesKey)?.let(::saveStreamBadgeRules)
         payload.decodeSyncBoolean(showFileSizeBadgesKey)?.let(::saveShowFileSizeBadges)
         payload.decodeSyncString(streamBadgePlacementKey)?.let(::saveStreamBadgePlacement)
+        payload.decodeSyncBoolean(incrementalLoadingKey)?.let(::saveIncrementalLoading)
     }
 }
