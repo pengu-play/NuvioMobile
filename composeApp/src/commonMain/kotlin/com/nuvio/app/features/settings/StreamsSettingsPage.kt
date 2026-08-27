@@ -88,6 +88,8 @@ import nuvio.composeapp.generated.resources.settings_stream_size_badges_descript
 import nuvio.composeapp.generated.resources.settings_stream_size_badges_title
 import nuvio.composeapp.generated.resources.settings_stream_addon_logo_title
 import nuvio.composeapp.generated.resources.settings_stream_addon_logo_description
+import nuvio.composeapp.generated.resources.settings_stream_incremental_title
+import nuvio.composeapp.generated.resources.settings_stream_incremental_description
 import nuvio.composeapp.generated.resources.settings_stream_display_section
 import org.jetbrains.compose.resources.stringResource
 
